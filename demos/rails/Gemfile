@@ -1,0 +1,40 @@
+source "https://rubygems.org"
+
+ruby "3.4.6"
+
+# Rails 8
+gem "rails", "~> 8.0.0"
+
+# Database
+gem "sqlite3", ">= 2.1"
+
+# Web server
+gem "puma", ">= 5.0"
+
+# Asset pipeline
+gem "propshaft"
+
+# Hotwire
+gem "turbo-rails"
+gem "stimulus-rails"
+
+# JSON
+gem "jbuilder"
+
+# Background jobs
+gem "delayed_job_active_record"
+
+# Imprint instrumentation (local gem for development)
+gem "imprint-ruby", path: "../../", require: "imprint"
+
+# Reduces boot times through caching
+gem "bootsnap", require: false
+
+group :development do
+  gem "web-console"
+end
+
+group :test do
+  gem "capybara"
+  gem "selenium-webdriver"
+end

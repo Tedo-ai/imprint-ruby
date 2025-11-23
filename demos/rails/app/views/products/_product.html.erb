@@ -1,0 +1,57 @@
+<article class="product-card" data-product-id="<%= product.id %>">
+  <div class="product-header">
+    <span class="sku"><%= product.sku %></span>
+    <span class="category"><%= product.category %></span>
+  </div>
+
+  <h3 class="product-name"><%= product.name %></h3>
+
+  <p class="product-description">
+    <%= truncate(product.description, length: 100) %>
+  </p>
+
+  <div class="product-footer">
+    <span class="price"><%= product.formatted_price %></span>
+    <span class="stock <%= product.stock > 0 ? 'in-stock' : 'out-of-stock' %>">
+      <%= product.stock > 0 ? "#{product.stock} in stock" : "Out of stock" %>
+    </span>
+  </div>
+</article>
+
+<style>
+  .product-card {
+    border: 1px solid #000;
+    padding: 16px;
+    font-family: monospace;
+    background: #fff;
+  }
+  .product-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  .product-name {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+  }
+  .product-description {
+    font-size: 14px;
+    color: #444;
+    margin-bottom: 12px;
+  }
+  .product-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #eee;
+    padding-top: 12px;
+  }
+  .price {
+    font-weight: bold;
+    font-size: 18px;
+  }
+  .stock.in-stock { color: #2e7d32; }
+  .stock.out-of-stock { color: #c62828; }
+</style>

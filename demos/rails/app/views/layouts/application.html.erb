@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Imprint Rails Demo - E-Commerce</title>
+
+  <!-- Imprint Trace Context for RUM -->
+  <%= imprint_meta_tags %>
+
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+      background: #fafafa;
+      color: #111;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Navigation */
+    nav.main-nav {
+      background: #000;
+      color: #fff;
+      padding: 16px 0;
+      border-bottom: 4px solid #333;
+    }
+
+    nav.main-nav .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    nav.main-nav .logo {
+      font-size: 20px;
+      font-weight: bold;
+      text-decoration: none;
+      color: #fff;
+    }
+
+    nav.main-nav .nav-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    nav.main-nav a {
+      color: #fff;
+      text-decoration: none;
+      padding: 8px 16px;
+      border: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+
+    nav.main-nav a:hover {
+      border-color: #fff;
+    }
+
+    /* Flash messages */
+    .flash {
+      padding: 16px;
+      margin: 20px 0;
+      border: 1px solid;
+    }
+
+    .flash.notice {
+      background: #e8f5e9;
+      border-color: #2e7d32;
+      color: #1b5e20;
+    }
+
+    .flash.alert {
+      background: #ffebee;
+      border-color: #c62828;
+      color: #b71c1c;
+    }
+
+    /* Main content */
+    main {
+      padding: 40px 0;
+      min-height: calc(100vh - 200px);
+    }
+
+    /* Footer */
+    footer {
+      background: #000;
+      color: #666;
+      padding: 20px 0;
+      text-align: center;
+      font-size: 12px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: bold;
+      text-decoration: none;
+      border: 2px solid #000;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #000;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #333;
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: #000;
+    }
+
+    .btn-secondary:hover {
+      background: #f0f0f0;
+    }
+
+    .btn-danger {
+      background: #c62828;
+      color: #fff;
+      border-color: #c62828;
+    }
+
+    .btn-danger:hover {
+      background: #b71c1c;
+    }
+  </style>
+</head>
+<body>
+  <nav class="main-nav">
+    <div class="container">
+      <a href="/" class="logo">IMPRINT DEMO</a>
+      <div class="nav-links">
+        <a href="/shop">Shop</a>
+        <a href="/products">Products API</a>
+        <a href="/crash">Trigger Error</a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="container">
+      <% if flash[:notice] %>
+        <div class="flash notice"><%= flash[:notice] %></div>
+      <% end %>
+      <% if flash[:alert] %>
+        <div class="flash alert"><%= flash[:alert] %></div>
+      <% end %>
+
+      <%= yield %>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      Imprint Rails Demo | Trace ID: <%= Imprint.current_trace_id || "N/A" %>
+    </div>
+  </footer>
+
+  <!-- Imprint Browser Agent (would be loaded from CDN in production) -->
+  <script>
+    // Simple trace context reader for demo purposes
+    window.ImprintContext = {
+      traceId: document.querySelector('meta[name="imprint-trace-id"]')?.content,
+      spanId: document.querySelector('meta[name="imprint-span-id"]')?.content
+    };
+
+    console.log('[Imprint] Page trace context:', window.ImprintContext);
+
+    // Intercept fetch to add trace headers
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+      if (window.ImprintContext.traceId) {
+        options.headers = options.headers || {};
+        // W3C Trace Context format
+        options.headers['traceparent'] = `00-${window.ImprintContext.traceId}-${generateSpanId()}-01`;
+      }
+      return originalFetch(url, options);
+    };
+
+    function generateSpanId() {
+      return Array.from(crypto.getRandomValues(new Uint8Array(8)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+  </script>
+</body>
+</html>
