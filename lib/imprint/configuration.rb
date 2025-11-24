@@ -2,13 +2,14 @@
 
 module Imprint
   class Configuration
-    attr_accessor :api_key, :service_name, :ingest_url, :enabled,
+    attr_accessor :api_key, :service_name, :job_namespace, :ingest_url, :enabled,
                   :ignore_paths, :ignore_prefixes, :ignore_extensions,
                   :batch_size, :flush_interval, :buffer_size, :debug
 
     def initialize
       @api_key = ENV["IMPRINT_API_KEY"]
       @service_name = ENV["IMPRINT_SERVICE_NAME"] || "ruby-app"
+      @job_namespace = ENV["IMPRINT_JOB_NAMESPACE"] # nil means use service_name
       @ingest_url = ENV["IMPRINT_INGEST_URL"] || "http://localhost:8080/v1/traces"
       @enabled = true
       @debug = ENV["IMPRINT_DEBUG"] == "true"
@@ -22,6 +23,11 @@ module Imprint
       @batch_size = 100
       @flush_interval = 5 # seconds
       @buffer_size = 1000
+    end
+
+    # Returns the namespace to use for background jobs
+    def effective_job_namespace
+      @job_namespace || @service_name
     end
 
     def valid?

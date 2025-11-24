@@ -90,6 +90,13 @@ module Imprint
 
     # Convert to hash for JSON serialization
     def to_h
+      # Merge SDK metadata into attributes (OpenTelemetry Semantic Conventions)
+      merged_attributes = @attributes.merge(
+        "telemetry.sdk.name" => Imprint::SDK_NAME,
+        "telemetry.sdk.version" => Imprint::VERSION,
+        "telemetry.sdk.language" => Imprint::SDK_LANGUAGE
+      )
+
       {
         trace_id: @trace_id,
         span_id: @span_id,
@@ -98,10 +105,10 @@ module Imprint
         name: @name,
         kind: @kind,
         start_time: @start_time.iso8601(9),
-        duration_ns: @duration_ns || 0,
+        duration_ns: (@duration_ns || 0).to_s,  # String for Go BigInt precision
         status_code: @status_code,
         error_data: @error_data,
-        attributes: @attributes.empty? ? nil : @attributes
+        attributes: merged_attributes
       }.compact
     end
 

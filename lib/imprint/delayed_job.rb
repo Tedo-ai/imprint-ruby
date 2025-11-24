@@ -85,7 +85,7 @@ module Imprint
             trace_id: trace_id,
             span_id: Span.generate_span_id,
             parent_id: parent_span_id,
-            namespace: Imprint.configuration.service_name,
+            namespace: Imprint.configuration.effective_job_namespace,
             name: span_name,
             kind: "consumer",
             client: Imprint.client

@@ -1,6 +1,5 @@
-GIT
-  remote: https://github.com/Tedo-ai/imprint-ruby.git
-  revision: 325ad682cc1a0b5903934e6d6dc66a5c85db92ea
+PATH
+  remote: ../..
   specs:
     imprint-ruby (0.1.0)
       concurrent-ruby (~> 1.0)

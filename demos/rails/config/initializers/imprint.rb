@@ -3,10 +3,13 @@
 
 Imprint.configure do |config|
   # API key for authentication
-  config.api_key = ENV.fetch("IMPRINT_API_KEY", "imp_live_4fdmJeWtI5M3gAu5f9XSi6Ds")
+  config.api_key = ENV.fetch("IMPRINT_API_KEY", "imp_live_00000000000000000")
 
-  # Service name appears in the dashboard
-  config.service_name = "imprint-rails-demo"
+  # Service name for HTTP requests (web namespace)
+  config.service_name = "web"
+
+  # Separate namespace for background jobs
+  config.job_namespace = "worker"
 
   # Ingest endpoint (production)
   config.ingest_url = ENV.fetch("IMPRINT_INGEST_URL", "https://api.imprint.cloud/v1/traces")
