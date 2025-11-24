@@ -24,7 +24,7 @@ Imprint is being released as **open source**. Learn more at [imprint.cloud](http
 Add to your Gemfile:
 
 ```ruby
-gem "imprint-ruby", github: "anthropics/imprint-ruby", require: "imprint"
+gem "imprint-ruby", github: "Tedo-ai/imprint-ruby", require: "imprint"
 ```
 
 Then run:
