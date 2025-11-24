@@ -24,8 +24,8 @@ gem "jbuilder"
 # Background jobs
 gem "delayed_job_active_record"
 
-# Imprint instrumentation (local gem for development)
-gem "imprint-ruby", path: "../../", require: "imprint"
+# Imprint instrumentation (from GitHub)
+gem "imprint-ruby", github: "Tedo-ai/imprint-ruby", require: "imprint"
 
 # Reduces boot times through caching
 gem "bootsnap", require: false
