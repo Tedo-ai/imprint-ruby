@@ -12,7 +12,8 @@ module Imprint
       @namespace = namespace
       @name = name
       @kind = kind
-      @start_time = Time.now.utc
+      @start_time = Time.now.utc  # Wall clock for display (when it happened)
+      @start_time_monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC, :nanosecond)  # Monotonic clock for accurate duration
       @status_code = 200
       @error_data = nil
       @attributes = {}
@@ -27,7 +28,8 @@ module Imprint
         return if @ended
 
         @ended = true
-        @duration_ns = ((Time.now.utc - @start_time) * 1_000_000_000).to_i
+        current_monotonic = Process.clock_gettime(Process::CLOCK_MONOTONIC, :nanosecond)
+        @duration_ns = current_monotonic - @start_time_monotonic
         @client&.queue_span(self)
       end
     end
