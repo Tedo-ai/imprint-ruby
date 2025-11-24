@@ -70,7 +70,22 @@ module Imprint
           parent = Context.current_span
           return unless parent
 
+          # Update span name to use Rails route pattern instead of actual path
+          # This provides consistency with other agents (Go/JS) that use route patterns
+          http_method = event.payload[:method]
+          route_pattern = extract_route_pattern(event.payload)
+
+          if route_pattern
+            parent.set_name("#{http_method} #{route_pattern}")
+          else
+            # Fallback to method + path if route pattern unavailable
+            path = event.payload[:path] || parent.name.split(" ", 2)[1]
+            parent.set_name("#{http_method} #{path}")
+          end
+
           # Add controller-specific attributes to the parent span
+          parent.set_attribute("code.namespace", event.payload[:controller])
+          parent.set_attribute("code.function", event.payload[:action])
           parent.set_attribute("controller", event.payload[:controller])
           parent.set_attribute("action", event.payload[:action])
           parent.set_attribute("format", event.payload[:format])
@@ -146,6 +161,32 @@ module Imprint
           return nil unless sql
 
           sql.length > max_length ? "#{sql[0, max_length]}..." : sql
+        end
+
+        def extract_route_pattern(payload)
+          # Try to get the route pattern from Rails routing
+          # The route pattern provides parameterized paths like /products/:id
+          # instead of actual paths like /products/123
+          return nil unless defined?(::Rails) && ::Rails.application
+
+          controller = payload[:controller]
+          action = payload[:action]
+          return nil unless controller && action
+
+          # Find the route that matches this controller#action
+          routes = ::Rails.application.routes.routes
+          route = routes.find do |r|
+            r.defaults[:controller] == controller && r.defaults[:action] == action
+          end
+
+          # Extract the path pattern from the route
+          if route && route.path.respond_to?(:spec)
+            # Remove the format specification (.:format) and convert to string
+            route.path.spec.to_s.gsub(/\(\.:format\)$/, "")
+          end
+        rescue => e
+          # Fallback to nil if route extraction fails
+          nil
         end
       end
     end
