@@ -356,7 +356,7 @@ This outputs:
 
 ### JavaScript Integration
 
-The [Imprint Browser Agent](https://github.com/anthropics/imprint/tree/main/agents/browser) reads these meta tags automatically and propagates trace context to fetch requests:
+The [Imprint Browser Agent](https://github.com/Tedo-ai/imprint/tree/main/agents/browser) reads these meta tags automatically and propagates trace context to fetch requests:
 
 ```javascript
 import { Imprint } from '@imprint/browser';
@@ -532,7 +532,7 @@ See the [Rails demo app](demos/rails) for a complete example including:
 
 ```bash
 # Clone the repository
-git clone https://github.com/anthropics/imprint-ruby.git
+git clone https://github.com/Tedo-ai/imprint-ruby.git
 cd imprint-ruby
 
 # Install dependencies
@@ -557,5 +557,5 @@ Contributions welcome! Please read our contributing guidelines before submitting
 
 - [Imprint Platform](https://imprint.cloud)
 - [Documentation](https://docs.imprint.cloud)
-- [Go Agent](https://github.com/anthropics/imprint-go)
-- [Browser Agent](https://github.com/anthropics/imprint/tree/main/agents/browser)
+- [Go Agent](https://github.com/Tedo-ai/imprint-go)
+- [Browser Agent](https://github.com/Tedo-ai/imprint/tree/main/agents/browser)
