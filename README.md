@@ -24,7 +24,7 @@ Imprint is being released as **open source**. Learn more at [imprint.cloud](http
 Add to your Gemfile:
 
 ```ruby
-gem "imprint-ruby"
+gem "imprint-ruby", github: "anthropics/imprint-ruby", require: "imprint"
 ```
 
 Then run:
@@ -43,7 +43,7 @@ Create an initializer at `config/initializers/imprint.rb`:
 Imprint.configure do |config|
   config.api_key = ENV["IMPRINT_API_KEY"]
   config.service_name = "my-app"
-  config.ingest_url = "https://api.imprint.cloud/v1/traces"
+  config.ingest_url = "https://api.imprint.cloud/v1/spans"
 end
 ```
 
@@ -82,7 +82,7 @@ Imprint.configure do |config|
   # Service identification
   config.service_name = "web"              # Default: "ruby-app" or Rails app name
   config.job_namespace = "worker"          # Default: same as service_name
-  config.ingest_url = "https://api.imprint.cloud/v1/traces"
+  config.ingest_url = "https://api.imprint.cloud/v1/spans"
 
   # Filtering
   config.ignore_paths = ["/health", "/up"]

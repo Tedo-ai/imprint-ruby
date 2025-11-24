@@ -10,7 +10,7 @@ module Imprint
       @api_key = ENV["IMPRINT_API_KEY"]
       @service_name = ENV["IMPRINT_SERVICE_NAME"] || "ruby-app"
       @job_namespace = ENV["IMPRINT_JOB_NAMESPACE"] # nil means use service_name
-      @ingest_url = ENV["IMPRINT_INGEST_URL"] || "http://localhost:8080/v1/traces"
+      @ingest_url = ENV["IMPRINT_INGEST_URL"] || "http://localhost:8080/v1/spans"
       @enabled = true
       @debug = ENV["IMPRINT_DEBUG"] == "true"
 

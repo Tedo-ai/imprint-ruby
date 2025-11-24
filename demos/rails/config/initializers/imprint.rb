@@ -12,7 +12,7 @@ Imprint.configure do |config|
   config.job_namespace = "worker"
 
   # Ingest endpoint (production)
-  config.ingest_url = ENV.fetch("IMPRINT_INGEST_URL", "https://api.imprint.cloud/v1/traces")
+  config.ingest_url = ENV.fetch("IMPRINT_INGEST_URL", "https://api.imprint.cloud/v1/spans")
 
   # Enable debug logging for development
   config.debug = Rails.env.development?
