@@ -11,10 +11,19 @@ require_relative "imprint/span"
 require_relative "imprint/client"
 require_relative "imprint/context"
 
-# Note: Imprint::Logger (traced_logger.rb) is NOT loaded by default to avoid
-# any potential conflicts with Ruby's stdlib Logger during boot.
-# To use Imprint::Logger, explicitly require it:
-#   require "imprint/traced_logger"
+# Note: Imprint::Logger is NOT auto-loaded. Configure it in an initializer:
+#
+#   # config/initializers/imprint.rb
+#   require "imprint/logger"
+#
+#   # Replace Rails logger
+#   imprint_logger = Imprint::Logger.new("rails")
+#   Rails.logger = ActiveSupport::TaggedLogging.new(imprint_logger)
+#
+#   # Or broadcast to both Imprint and stdout
+#   imprint_logger = Imprint::Logger.new("rails")
+#   imprint_logger.broadcast_to(Rails.logger)
+#   Rails.logger = ActiveSupport::TaggedLogging.new(imprint_logger)
 
 # Rails integration - always require, but it only activates when Rails is present
 require_relative "imprint/railtie"
