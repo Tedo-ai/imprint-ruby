@@ -26,7 +26,7 @@ RSpec.describe "Logger stdlib compatibility" do
   it "allows explicit require of Imprint::Logger" do
     require "imprint"
     require "logger"
-    require "imprint/logger"
+    require "imprint/log"
 
     expect(defined?(Imprint::Logger)).to eq("constant")
     expect(Imprint::Logger.superclass).to eq(::Logger)
@@ -35,7 +35,7 @@ end
 
 RSpec.describe "Imprint::Logger" do
   before do
-    require "imprint/logger"
+    require "imprint/log"
 
     Imprint.configure do |config|
       config.api_key = "test_key"

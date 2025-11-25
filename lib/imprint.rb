@@ -14,7 +14,7 @@ require_relative "imprint/context"
 # Note: Imprint::Logger is NOT auto-loaded. Configure it in an initializer:
 #
 #   # config/initializers/imprint.rb
-#   require "imprint/logger"
+#   require "imprint/log"
 #
 #   # Replace Rails logger
 #   imprint_logger = Imprint::Logger.new("rails")
