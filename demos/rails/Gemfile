@@ -27,6 +27,9 @@ gem "delayed_job_active_record"
 # Imprint instrumentation (local for development)
 gem "imprint-ruby", path: "../..", require: "imprint"
 
+# CORS support for browser trace propagation
+gem "rack-cors"
+
 # Reduces boot times through caching
 gem "bootsnap", require: false
 

@@ -107,7 +107,7 @@ module Imprint
         name: @name,
         kind: @kind,
         start_time: @start_time.iso8601(9),
-        duration_ns: (@duration_ns || 0).to_s,  # String for Go BigInt precision
+        duration_ns: Integer(@duration_ns || 0),  # Explicit Integer (matching Go uint64)
         status_code: @status_code,
         error_data: @error_data,
         attributes: merged_attributes

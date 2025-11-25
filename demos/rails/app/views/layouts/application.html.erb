@@ -176,31 +176,19 @@
     </div>
   </footer>
 
-  <!-- Imprint Browser Agent (would be loaded from CDN in production) -->
+  <!-- Imprint Browser Agent -->
+  <script src="/imprint.js"></script>
   <script>
-    // Simple trace context reader for demo purposes
-    window.ImprintContext = {
-      traceId: document.querySelector('meta[name="imprint-trace-id"]')?.content,
-      spanId: document.querySelector('meta[name="imprint-span-id"]')?.content
-    };
-
-    console.log('[Imprint] Page trace context:', window.ImprintContext);
-
-    // Intercept fetch to add trace headers
-    const originalFetch = window.fetch;
-    window.fetch = function(url, options = {}) {
-      if (window.ImprintContext.traceId) {
-        options.headers = options.headers || {};
-        // W3C Trace Context format
-        options.headers['traceparent'] = `00-${window.ImprintContext.traceId}-${generateSpanId()}-01`;
-      }
-      return originalFetch(url, options);
-    };
-
-    function generateSpanId() {
-      return Array.from(crypto.getRandomValues(new Uint8Array(8)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+    // Initialize Imprint Browser Agent with serviceName='frontend' for Top Pages tracking
+    if (window.Imprint) {
+      window.Imprint.init({
+        publicKey: '<%= ENV["IMPRINT_API_KEY"] %>',
+        ingestUrl: '<%= ENV["IMPRINT_INGEST_URL"] %>',
+        serviceName: 'frontend'  // Required for Top Pages in Overview
+      });
+      console.log('[Imprint] Browser agent initialized with namespace: frontend');
+    } else {
+      console.warn('[Imprint] Browser agent not loaded');
     }
   </script>
 </body>

@@ -10,7 +10,7 @@ require_relative "imprint/configuration"
 require_relative "imprint/span"
 require_relative "imprint/client"
 require_relative "imprint/context"
-require_relative "imprint/logger"
+require_relative "imprint/traced_logger"
 
 # Rails integration - always require, but it only activates when Rails is present
 require_relative "imprint/railtie"
