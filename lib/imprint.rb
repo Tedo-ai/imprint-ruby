@@ -10,6 +10,7 @@ require_relative "imprint/configuration"
 require_relative "imprint/span"
 require_relative "imprint/client"
 require_relative "imprint/context"
+require_relative "imprint/metrics"
 
 # Note: Imprint::Logger is NOT auto-loaded. Configure it in an initializer:
 #
@@ -56,6 +57,17 @@ module Imprint
     def record_event(name, attributes: {})
       client.record_event(name, attributes: attributes)
     end
+
+    # Convenience method to record a gauge metric value
+    # @param name [String] The metric name (e.g., "process.runtime.ruby.mem.rss")
+    # @param value [Numeric] The metric value
+    # @param attributes [Hash] Additional attributes to attach
+    def record_gauge(name, value, attributes: {})
+      client.record_gauge(name, value, attributes: attributes)
+    end
+
+    # Alias for AppSignal compatibility
+    alias_method :set_gauge, :record_gauge
 
     # Shutdown the client gracefully
     def shutdown(timeout: 5)

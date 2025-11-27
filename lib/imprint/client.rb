@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "socket"
+
 module Imprint
   class Client
     def initialize(configuration)
@@ -78,6 +80,52 @@ module Imprint
         kind: "event",
         client: self
       )
+
+      attributes.each { |k, v| span.set_attribute(k, v) }
+      queue_span(span)
+    end
+
+    # Record a gauge metric value (numeric measurement at a point in time).
+    # Gauges are used for values that can go up or down, such as:
+    # - Memory usage (process.runtime.ruby.mem.rss)
+    # - CPU percentage
+    # - Queue depth
+    # - Active connections
+    #
+    # The value is stored in the "metric.value" attribute, which the dashboard
+    # uses to distinguish gauges from counters and render them as line charts.
+    #
+    # A "service.instance.id" attribute is automatically added using the hostname
+    # if not already present, enabling multi-instance aggregation in the dashboard.
+    #
+    # @param name [String] The metric name (e.g., "process.runtime.ruby.mem.rss")
+    # @param value [Numeric] The metric value
+    # @param attributes [Hash] Additional attributes to attach
+    def record_gauge(name, value, attributes: {})
+      return unless enabled?
+
+      parent = Context.current_span
+      trace_id = parent&.trace_id || Span.generate_trace_id
+      parent_id = parent&.span_id
+
+      span = Span.new(
+        trace_id: trace_id,
+        span_id: Span.generate_span_id,
+        parent_id: parent_id,
+        namespace: @config.service_name,
+        name: name,
+        kind: "event",
+        client: self
+      )
+
+      # Set the gauge value - this is what makes it a gauge vs counter
+      span.set_attribute("metric.value", value.to_s)
+
+      # Auto-inject service.instance.id (hostname) if not present
+      # This enables multi-instance aggregation in the dashboard
+      unless attributes.key?("service.instance.id") || attributes.key?(:"service.instance.id")
+        span.set_attribute("service.instance.id", Socket.gethostname)
+      end
 
       attributes.each { |k, v| span.set_attribute(k, v) }
       queue_span(span)

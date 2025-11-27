@@ -11,6 +11,8 @@ Imprint is being released as **open source**. Learn more at [imprint.cloud](http
 - **SQL query tracing** — automatic instrumentation of ActiveRecord queries
 - **Background job support** — ActiveJob, Sidekiq, and Delayed::Job
 - **Browser integration** — link frontend RUM traces to backend spans
+- **Gauge metrics** — numeric measurements with multi-instance aggregation
+- **Runtime metrics** — automatic collection of memory, GC, and thread stats
 - **Manual instrumentation** — custom spans, events, and attributes
 - **Thread-safe batching** — efficient span collection with configurable flush intervals
 
@@ -192,7 +194,7 @@ end
 
 ### Events
 
-Record instant events (zero-duration spans) for logging and metrics:
+Record instant events (zero-duration spans) for logging and business events:
 
 ```ruby
 Imprint.record_event("user.login", attributes: {
@@ -207,6 +209,29 @@ Imprint.record_event("payment.processed", attributes: {
   currency: "USD"
 })
 ```
+
+### Gauge Metrics
+
+Gauges are numeric values that can go up or down over time (memory usage, queue depth, active connections). They appear as **line charts** in the dashboard:
+
+```ruby
+# Record a gauge metric
+Imprint.record_gauge("queue.depth", queue.size, attributes: {
+  queue_name: "orders"
+})
+
+# Memory usage example
+Imprint.record_gauge("cache.size_bytes", cache.bytesize)
+
+# Active connections
+Imprint.record_gauge("db.connections.active", pool.active_count)
+```
+
+**Key behaviors:**
+- Sets `metric.value` attribute automatically (this is what makes it a gauge vs counter)
+- Auto-injects `service.instance.id` (hostname) for **multi-instance aggregation** in the dashboard
+- Dashboard shows multiple lines when the same metric is emitted from different instances
+- Alias: `Imprint.set_gauge` for AppSignal compatibility
 
 ### Action and Namespace
 
@@ -408,6 +433,59 @@ Imprint.start_span("external_api", kind: "client") do |span|
 end
 ```
 
+## Runtime Metrics
+
+Collect Ruby runtime statistics (memory, GC, threads) automatically:
+
+```ruby
+# In config/initializers/imprint.rb
+Imprint::Metrics.start
+
+# Or with custom interval (default: 60 seconds)
+Imprint::Metrics.start(interval: 30)
+```
+
+### Manual Control
+
+```ruby
+# Start collection
+Imprint::Metrics.start
+
+# Check if running
+Imprint::Metrics.running?  # => true
+
+# Stop collection
+Imprint::Metrics.stop
+```
+
+### Collected Metrics
+
+Each metric is emitted as a **gauge** and appears as a line chart in the Events page. When running multiple instances (e.g., multiple Puma workers or pods), you'll see separate lines for each hostname.
+
+| Metric | Description |
+|--------|-------------|
+| `process.runtime.ruby.mem.rss` | Resident Set Size (memory usage in bytes) |
+| `process.runtime.ruby.gc.count` | Total GC cycles |
+| `process.runtime.ruby.gc.heap_allocated_pages` | Allocated heap pages |
+| `process.runtime.ruby.gc.heap_live_slots` | Live object slots |
+| `process.runtime.ruby.gc.heap_free_slots` | Free object slots |
+| `process.runtime.ruby.gc.total_allocated_objects` | Total objects allocated |
+| `process.runtime.ruby.gc.total_freed_objects` | Total objects freed |
+| `process.runtime.ruby.gc.malloc_increase_bytes` | Malloc increase |
+| `process.runtime.ruby.gc.minor_gc_count` | Minor GC cycles |
+| `process.runtime.ruby.gc.major_gc_count` | Major GC cycles |
+| `process.runtime.ruby.threads.count` | Active threads |
+| `process.runtime.ruby.objects.count` | Total objects in memory |
+
+### Multi-Instance Aggregation
+
+When running multiple instances (Puma workers, Kubernetes pods), the dashboard automatically shows separate lines for each instance:
+
+```ruby
+# Each instance automatically gets its hostname as service.instance.id
+# No additional configuration needed!
+```
+
 ## Structured Logging
 
 Use `Imprint::Logger` for logs that appear as event spans:
@@ -444,6 +522,8 @@ Imprint.configuration
 # Span Management
 Imprint.start_span(name, kind: "internal") { |span| ... }
 Imprint.record_event(name, attributes: {})
+Imprint.record_gauge(name, value, attributes: {})
+Imprint.set_gauge(name, value, attributes: {})  # Alias for AppSignal compatibility
 
 # Current Span Modification
 Imprint.tag(key: value, ...)
@@ -458,6 +538,11 @@ Imprint.client
 
 # Lifecycle
 Imprint.shutdown(timeout: 5)
+
+# Runtime Metrics
+Imprint::Metrics.start(interval: 60)
+Imprint::Metrics.stop
+Imprint::Metrics.running?
 ```
 
 ### Span Methods
