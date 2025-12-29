@@ -25,6 +25,11 @@ module Imprint
       @buffer_size = 1000
     end
 
+    # Returns the metrics ingest URL derived from ingest_url
+    def metrics_url
+      @ingest_url.sub("/v1/spans", "/v1/metrics")
+    end
+
     # Returns the namespace to use for background jobs
     def effective_job_namespace
       @job_namespace || @service_name

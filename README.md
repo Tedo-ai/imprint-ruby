@@ -638,6 +638,10 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 Contributions welcome! Please read our contributing guidelines before submitting pull requests.
 
+## Compatibility
+
+For SDK version compatibility with the Imprint platform, required dependencies, and feature availability by version, see the [Compatibility Matrix](../COMPATIBILITY.md).
+
 ## Links
 
 - [Imprint Platform](https://imprint.cloud)

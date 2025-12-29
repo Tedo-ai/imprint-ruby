@@ -7,6 +7,7 @@ module Imprint
     def initialize(configuration)
       @config = configuration
       @buffer = Concurrent::Array.new
+      @log_buffer = Concurrent::Array.new
       @mutex = Mutex.new
       @stopped = false
       @worker_thread = nil
@@ -131,6 +132,49 @@ module Imprint
       queue_span(span)
     end
 
+    # Record a log entry with trace correlation
+    # Logs are sent to the dedicated /v1/logs endpoint for optimized storage
+    # and querying separate from spans.
+    #
+    # @param message [String] The log message
+    # @param severity [String] Log severity: debug, info, warn, error, fatal
+    # @param attributes [Hash] Additional attributes to attach
+    def record_log(message, severity: "info", attributes: {})
+      return unless enabled?
+
+      # Get trace context if available
+      current_span = Context.current_span
+      trace_id = current_span&.trace_id || ""
+      span_id = current_span&.span_id || ""
+
+      log_entry = {
+        timestamp: Time.now.utc.iso8601(9),
+        trace_id: trace_id,
+        span_id: span_id,
+        severity: normalize_severity(severity),
+        message: message.to_s,
+        namespace: @config.service_name,
+        attributes: attributes.transform_keys(&:to_s).transform_values(&:to_s).merge(
+          "telemetry.sdk.name" => Imprint::SDK_NAME,
+          "telemetry.sdk.version" => Imprint::VERSION,
+          "telemetry.sdk.language" => Imprint::SDK_LANGUAGE
+        )
+      }
+
+      queue_log(log_entry)
+    end
+
+    # Queue a log entry for batch sending
+    def queue_log(log_entry)
+      return unless enabled?
+
+      if @log_buffer.size < @config.buffer_size
+        @log_buffer << log_entry
+        flush_logs_sync if @log_buffer.size >= @config.batch_size
+      end
+      # Drop log if buffer is full (avoid memory issues)
+    end
+
     # Queue a span for batch sending
     def queue_span(span)
       return unless enabled?
@@ -142,11 +186,12 @@ module Imprint
       # Drop span if buffer is full (avoid memory issues)
     end
 
-    # Shutdown the client and flush remaining spans
+    # Shutdown the client and flush remaining spans and logs
     def shutdown(timeout: 5)
       @stopped = true
       @worker_thread&.kill
       flush_sync
+      flush_logs_sync
     end
 
     def enabled?
@@ -164,7 +209,10 @@ module Imprint
       @worker_thread = Thread.new do
         loop do
           sleep @config.flush_interval
-          flush_sync unless @stopped
+          unless @stopped
+            flush_sync
+            flush_logs_sync
+          end
         rescue => e
           # Log error but don't crash the worker
         end
@@ -181,6 +229,18 @@ module Imprint
       end
 
       send_batch(spans_to_send) if spans_to_send.any?
+    end
+
+    def flush_logs_sync
+      logs_to_send = []
+      @mutex.synchronize do
+        return if @log_buffer.empty?
+
+        logs_to_send = @log_buffer.to_a
+        @log_buffer.clear
+      end
+
+      send_logs_batch(logs_to_send) if logs_to_send.any?
     end
 
     def send_batch(spans)
@@ -210,6 +270,53 @@ module Imprint
     rescue => e
       debug_log("Error sending spans: #{e.class} - #{e.message}")
       # Silently fail to avoid impacting the application
+    end
+
+    def send_logs_batch(logs)
+      # Build logs URL from ingest URL (replace /v1/spans with /v1/logs)
+      logs_url = @config.ingest_url.sub("/v1/spans", "/v1/logs")
+      uri = URI(logs_url)
+
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = uri.scheme == "https"
+      if http.use_ssl?
+        http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+        http.verify_callback = ->(_preverify_ok, store_context) {
+          store_context.error == 0 || store_context.error == 3
+        }
+      end
+      http.open_timeout = 5
+      http.read_timeout = 5
+
+      request = Net::HTTP::Post.new(uri.path)
+      request["Content-Type"] = "application/json"
+      request["Authorization"] = "Bearer #{@config.api_key}"
+      request.body = logs.to_json
+
+      debug_log("Sending #{logs.size} logs to #{logs_url}")
+      response = http.request(request)
+      debug_log("Response: #{response.code} #{response.message}")
+      response
+    rescue => e
+      debug_log("Error sending logs: #{e.class} - #{e.message}")
+      # Silently fail to avoid impacting the application
+    end
+
+    def normalize_severity(severity)
+      case severity.to_s.downcase
+      when "debug", "trace"
+        "debug"
+      when "info", "information"
+        "info"
+      when "warn", "warning"
+        "warn"
+      when "error", "err"
+        "error"
+      when "fatal", "critical", "panic"
+        "fatal"
+      else
+        "info"
+      end
     end
 
     def debug_log(message)

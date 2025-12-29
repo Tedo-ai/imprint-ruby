@@ -69,6 +69,42 @@ module Imprint
     # Alias for AppSignal compatibility
     alias_method :set_gauge, :record_gauge
 
+    # Convenience method to record a log entry with trace correlation
+    # Logs are sent to a dedicated logs endpoint for optimized storage.
+    #
+    # @param message [String] The log message
+    # @param severity [String] Log severity: debug, info, warn, error, fatal
+    # @param attributes [Hash] Additional attributes to attach
+    #
+    # Usage:
+    #   Imprint.log("User signed in", severity: "info", attributes: { user_id: 123 })
+    #   Imprint.log("Payment failed", severity: "error", attributes: { order_id: 456 })
+    #
+    def log(message, severity: "info", attributes: {})
+      client.record_log(message, severity: severity, attributes: attributes)
+    end
+
+    # Alias methods for common log levels
+    def debug(message, attributes: {})
+      log(message, severity: "debug", attributes: attributes)
+    end
+
+    def info(message, attributes: {})
+      log(message, severity: "info", attributes: attributes)
+    end
+
+    def warn(message, attributes: {})
+      log(message, severity: "warn", attributes: attributes)
+    end
+
+    def error(message, attributes: {})
+      log(message, severity: "error", attributes: attributes)
+    end
+
+    def fatal(message, attributes: {})
+      log(message, severity: "fatal", attributes: attributes)
+    end
+
     # Shutdown the client gracefully
     def shutdown(timeout: 5)
       @client&.shutdown(timeout: timeout)

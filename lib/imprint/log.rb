@@ -146,20 +146,14 @@ module Imprint
         .merge(extra_attributes.transform_keys(&:to_s))
 
       # Add standard log attributes
-      attributes["log.level"] = level.to_s
       attributes["log.group"] = @group
-      attributes["log.message"] = truncate(message, 4096)
 
-      # Add trace context if available
-      if (current_span = Imprint::Context.current_span)
-        attributes["trace_id"] = current_span.trace_id
-        attributes["span_id"] = current_span.span_id
-      end
-
-      # Create span name
-      span_name = "log.#{level}"
-
-      Imprint.client.record_event(span_name, attributes: attributes)
+      # Use the dedicated logs endpoint for better storage and querying
+      Imprint.client.record_log(
+        truncate(message, 4096),
+        severity: level.to_s,
+        attributes: attributes
+      )
     end
 
     def parse_message_attributes(message)
