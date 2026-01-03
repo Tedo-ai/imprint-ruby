@@ -12,6 +12,7 @@ require_relative "imprint/client"
 require_relative "imprint/context"
 require_relative "imprint/metrics"
 require_relative "imprint/llm"
+require_relative "imprint/agent"
 
 # Note: Imprint::Logger is NOT auto-loaded. Configure it in an initializer:
 #
