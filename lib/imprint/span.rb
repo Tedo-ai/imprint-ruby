@@ -44,11 +44,17 @@ module Imprint
     end
 
     # Record an error on the span
+    # For exceptions, includes class, message, and first 10 lines of backtrace
     def record_error(error)
       return unless error
 
       @mutex.synchronize do
-        @error_data = error.is_a?(Exception) ? "#{error.class}: #{error.message}" : error.to_s
+        if error.is_a?(Exception)
+          backtrace = error.backtrace&.first(10)&.join("\n")
+          @error_data = backtrace ? "#{error.class}: #{error.message}\n#{backtrace}" : "#{error.class}: #{error.message}"
+        else
+          @error_data = error.to_s
+        end
         @status_code = 500 if @status_code < 400
       end
     end
