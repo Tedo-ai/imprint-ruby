@@ -69,6 +69,47 @@ IMPRINT_SERVICE_NAME=my-app
 IMPRINT_JOB_NAMESPACE=worker
 ```
 
+### Dashboard-as-Code
+
+Imprint is not just tracing plus a hosted UI. The intended setup is that your app repo can also define its own dashboards in `.imprint/`, so the service team owns both instrumentation and the default views for that service.
+
+Create `.imprint/dashboards.yaml` in your Rails app:
+
+```yaml
+version: "1"
+
+dashboards:
+  - name: rails-overview
+    description: Rails health overview
+    charts:
+      - title: Request Rate
+        metric: http.requests
+        type: timeseries
+        aggregation: rate
+
+      - title: P95 Latency
+        metric: http.duration
+        type: timeseries
+        aggregation: p95
+
+      - title: SQL Duration P95
+        metric: db.duration
+        type: timeseries
+        aggregation: p95
+```
+
+Then sync it to your Imprint project with the Imprint CLI:
+
+```bash
+go run ./cmd/imprint sync --config .imprint
+```
+
+Hosted setup tips:
+
+- Use the API key from the Uno Cloud Tracing project's `Developer Setup` tab for instrumentation.
+- Use the Imprint project API endpoint when syncing dashboard config, typically `IMPRINT_ENDPOINT=https://api.imprint.cloud`.
+- Keep `.imprint/` in the application repository so dashboard changes ship alongside tracing changes.
+
 ### Non-Rails
 
 ```ruby
