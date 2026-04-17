@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.description   = "Automatic instrumentation for Rails, Sidekiq, and Delayed::Job with trace propagation"
   spec.homepage      = "https://github.com/tedo-ai/imprint-ruby"
   spec.license       = "MIT"
-  spec.required_ruby_version = ">= 3.0.0"
+  spec.required_ruby_version = ">= 2.7.0"
 
   spec.files         = Dir["lib/**/*", "LICENSE", "README.md"]
   spec.require_paths = ["lib"]
