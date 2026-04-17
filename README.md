@@ -18,8 +18,11 @@ Imprint is being released as **open source**. Learn more at [imprint.cloud](http
 
 ## Requirements
 
-- Ruby >= 3.0.0
+- Ruby >= 2.7.0
 - Rails 6.0+ (optional, for automatic instrumentation)
+
+The gem is intended to work with older Ruby 2.7 applications.
+The bundled demo app under `demos/rails` is a separate Rails 8 example and therefore requires a newer Ruby than the gem itself.
 
 ## Installation
 
