@@ -13,7 +13,7 @@ end
 
 # Optional dependencies for testing integrations
 group :test do
-  gem "rails", "~> 7.0"
+  gem "rails", ">= 7.0", "< 7.1"
   gem "sidekiq", "~> 7.0"
   gem "delayed_job", "~> 4.1"
   gem "delayed_job_active_record", "~> 4.1"
