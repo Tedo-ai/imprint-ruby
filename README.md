@@ -37,6 +37,8 @@ bundle install
 
 ## Quick Start
 
+If you are onboarding through Uno Cloud Tracing, use the API key and environment block from the project's `Developer Setup` tab. The values there are the canonical hosted setup for your Imprint project.
+
 ### Rails
 
 Create an initializer at `config/initializers/imprint.rb`:
@@ -45,7 +47,7 @@ Create an initializer at `config/initializers/imprint.rb`:
 Imprint.configure do |config|
   config.api_key = ENV["IMPRINT_API_KEY"]
   config.service_name = "my-app"
-  config.ingest_url = "https://api.imprint.cloud/v1/spans"
+  config.ingest_url = "https://ingest.imprint.cloud/v1/spans"
 end
 ```
 
@@ -54,6 +56,15 @@ That's it. The Railtie automatically instruments:
 - SQL queries
 - View rendering
 - Background jobs
+
+For a production-friendly Rails setup, it is usually best to keep the API key and ingest URL in environment variables:
+
+```bash
+IMPRINT_API_KEY=...
+IMPRINT_INGEST_URL=https://ingest.imprint.cloud/v1/spans
+IMPRINT_SERVICE_NAME=my-app
+IMPRINT_JOB_NAMESPACE=worker
+```
 
 ### Non-Rails
 
@@ -84,7 +95,7 @@ Imprint.configure do |config|
   # Service identification
   config.service_name = "web"              # Default: "ruby-app" or Rails app name
   config.job_namespace = "worker"          # Default: same as service_name
-  config.ingest_url = "https://api.imprint.cloud/v1/spans"
+  config.ingest_url = "https://ingest.imprint.cloud/v1/spans"
 
   # Filtering
   config.ignore_paths = ["/health", "/up"]
@@ -111,6 +122,9 @@ end
 | `IMPRINT_JOB_NAMESPACE` | Namespace for background jobs |
 | `IMPRINT_INGEST_URL` | Ingest endpoint URL |
 | `IMPRINT_DEBUG` | Enable debug logging (`"true"`) |
+
+Use `https://ingest.imprint.cloud/v1/spans` as the canonical hosted ingest endpoint.
+Legacy ingestion through `https://api.imprint.cloud/v1/spans` is still routed for compatibility, but new setups should prefer the dedicated ingest host.
 
 ## Automatic Instrumentation
 
