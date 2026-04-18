@@ -14,25 +14,13 @@ require_relative "imprint/metrics"
 require_relative "imprint/llm"
 require_relative "imprint/agent"
 
-# Note: Imprint::Logger is NOT auto-loaded. Configure it in an initializer:
-#
-#   # config/initializers/imprint.rb
-#   require "imprint/log"
-#
-#   # Replace Rails logger
-#   imprint_logger = Imprint::Logger.new("rails")
-#   Rails.logger = ActiveSupport::TaggedLogging.new(imprint_logger)
-#
-#   # Or broadcast to both Imprint and stdout
-#   imprint_logger = Imprint::Logger.new("rails")
-#   imprint_logger.broadcast_to(Rails.logger)
-#   Rails.logger = ActiveSupport::TaggedLogging.new(imprint_logger)
-
 # Rails integration - always require, but it only activates when Rails is present
 require_relative "imprint/railtie"
 
 module Imprint
   class Error < StandardError; end
+
+  autoload :Logger, "imprint/log"
 
   class << self
     attr_writer :configuration
@@ -208,6 +196,27 @@ module Imprint
       else
         log_outside_request("tag called outside of request context")
       end
+    end
+
+    # Alias-friendly helper for AppSignal/New Relic style tagging.
+    #
+    # Usage:
+    #   Imprint.set_tag(:user_id, current_user.id)
+    #   Imprint.set_tag(user_id: current_user.id, plan: "premium")
+    #
+    def set_tag(*args, **kwargs)
+      tags =
+        if kwargs.any?
+          kwargs
+        elsif args.length == 2
+          { args[0] => args[1] }
+        elsif args.length == 1 && args[0].is_a?(Hash)
+          args[0]
+        else
+          {}
+        end
+
+      tag(tags)
     end
 
     # Get the current trace ID (useful for logging correlation)

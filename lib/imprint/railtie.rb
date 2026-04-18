@@ -15,6 +15,8 @@ if defined?(Rails::Railtie)
       end
 
       initializer "imprint.subscribe_to_notifications" do
+        Imprint::Rails::Subscriber.subscribe_cache!
+
         # Subscribe to ActiveSupport::Notifications after Rails initializes
         ActiveSupport.on_load(:active_record) do
           Imprint::Rails::Subscriber.subscribe_sql!
@@ -27,6 +29,10 @@ if defined?(Rails::Railtie)
         ActiveSupport.on_load(:action_view) do
           include Imprint::ViewHelper
           Imprint::Rails::Subscriber.subscribe_view!
+        end
+
+        ActiveSupport.on_load(:action_mailer) do
+          Imprint::Rails::Subscriber.subscribe_mailer!
         end
       end
 

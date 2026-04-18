@@ -9,6 +9,7 @@ Imprint is being released as **open source**. Learn more at [imprint.cloud](http
 - **Zero-config Rails integration** — automatic instrumentation via Railtie
 - **Distributed tracing** — W3C Trace Context propagation across services
 - **SQL query tracing** — automatic instrumentation of ActiveRecord queries
+- **Rails notification coverage** — controller, template, partial, collection, cache, and mailer events
 - **Background job support** — ActiveJob, Sidekiq, and Delayed::Job
 - **Browser integration** — link frontend RUM traces to backend spans
 - **Gauge metrics** — numeric measurements with multi-instance aggregation
@@ -57,7 +58,9 @@ end
 That's it. The Railtie automatically instruments:
 - HTTP requests
 - SQL queries
-- View rendering
+- View rendering, partials, and collections
+- Rails cache reads, writes, fetch hits, and miss computation
+- Action Mailer processing and delivery
 - Background jobs
 
 For a production-friendly Rails setup, it is usually best to keep the API key and ingest URL in environment variables:
@@ -215,6 +218,36 @@ Attributes:
   template.layout: layouts/application
 ```
 
+Rails partial and collection notifications are also captured, so expensive fan-out rendering shows up as separate child spans instead of being flattened into one template render.
+
+### Cache Operations
+
+Rails cache notifications create child spans with hit or miss context:
+
+```
+Name: cache.fetch
+Kind: client
+Attributes:
+  cache.operation: fetch_hit
+  cache.hit: true
+  cache.key_prefix: views/orders/*
+```
+
+Cache misses also emit a `cache_miss_compute` span so the expensive work hidden behind `Rails.cache.fetch` is visible in traces.
+
+### Mailers
+
+Action Mailer processing and delivery create child spans:
+
+```
+Name: mailer.deliver
+Kind: internal
+Attributes:
+  mailer.class: UserMailer
+  mailer.action: welcome_email
+  email.message_id: <...>
+```
+
 ## Manual Instrumentation
 
 ### Custom Spans
@@ -249,6 +282,8 @@ class OrdersController < ApplicationController
   end
 end
 ```
+
+You can also use `Imprint.set_tag(:key, value)` when that reads more naturally in existing codebases.
 
 ### Events
 
@@ -568,6 +603,8 @@ class PaymentService
 end
 ```
 
+`Imprint::Logger` autoloads when you `require "imprint"`, so Rails initializers no longer need a separate `require "imprint/log"`.
+
 ## API Reference
 
 ### Module Methods
@@ -585,6 +622,7 @@ Imprint.set_gauge(name, value, attributes: {})  # Alias for AppSignal compatibil
 
 # Current Span Modification
 Imprint.tag(key: value, ...)
+Imprint.set_tag(:key, value)
 Imprint.set_action(name)
 Imprint.set_namespace(namespace)
 Imprint.send_error(exception, **context)

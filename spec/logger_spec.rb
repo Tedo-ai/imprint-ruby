@@ -15,18 +15,16 @@ RSpec.describe "Logger stdlib compatibility" do
     expect { Logger::Severity.constants }.not_to raise_error
   end
 
-  it "does not auto-require Imprint::Logger to avoid boot conflicts" do
+  it "autoloads Imprint::Logger without shadowing stdlib Logger" do
     require "imprint"
 
-    # Imprint::Logger should NOT be defined by default
-    expect(defined?(Imprint::Logger)).to be_nil,
-      "Imprint::Logger should not be auto-loaded"
+    expect(Imprint.autoload?(:Logger)).to eq("imprint/log")
+    expect(defined?(Imprint::Logger)).to eq("constant")
   end
 
-  it "allows explicit require of Imprint::Logger" do
+  it "resolves Imprint::Logger when referenced" do
     require "imprint"
     require "logger"
-    require "imprint/log"
 
     expect(defined?(Imprint::Logger)).to eq("constant")
     expect(Imprint::Logger.superclass).to eq(::Logger)
