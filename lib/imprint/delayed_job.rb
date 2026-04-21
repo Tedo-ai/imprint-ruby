@@ -15,8 +15,12 @@ module Imprint
         @parent_span_id = parent_span_id
       end
 
-      # Delegate perform to the wrapped payload
+      # Stale Delayed::Job payloads can deserialize to nil if the original job
+      # class was removed or renamed. Treat those jobs as harmless no-ops so
+      # Imprint tracing never becomes the source of repeated retries.
       def perform
+        return nil unless @payload
+
         @payload.perform
       end
 
@@ -144,6 +148,7 @@ module Imprint
 
           # Unwrap if it's our TracedPayload wrapper
           actual_payload = payload.is_a?(TracedPayload) ? payload.payload : payload
+          return "UnknownJob#perform" if actual_payload.nil?
 
           case actual_payload
           when ::Delayed::PerformableMethod
