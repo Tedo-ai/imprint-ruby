@@ -40,13 +40,13 @@ module Imprint
         env["imprint.span"] = span
         env["imprint.trace_id"] = trace_id
         env["imprint.span_id"] = span.span_id
+        span.set_attribute("http.method", request.request_method)
+        span.set_attribute("http.url", request.url)
 
         Context.with_span(span) do
           status, headers, response = @app.call(env)
 
           span.set_status(status)
-          span.set_attribute("http.method", request.request_method)
-          span.set_attribute("http.url", request.url)
           span.set_attribute("http.status_code", status)
 
           if status >= 500
@@ -58,6 +58,8 @@ module Imprint
           [status, headers, response]
         end
       rescue => e
+        span&.set_status(500)
+        span&.set_attribute("http.status_code", 500)
         span&.record_error(e)
         span&.finish
         raise
