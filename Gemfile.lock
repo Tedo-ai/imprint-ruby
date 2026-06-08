@@ -1,9 +1,9 @@
 PATH
   remote: .
   specs:
-    imprint-ruby (0.1.0)
+    imprint-ruby (0.1.1)
       concurrent-ruby (~> 1.0)
-      ostruct
+      ostruct (>= 0.3)
 
 GEM
   remote: https://rubygems.org/
@@ -253,4 +253,4 @@ DEPENDENCIES
   webmock (~> 3.0)
 
 BUNDLED WITH
-   2.4.22
+  4.0.11
