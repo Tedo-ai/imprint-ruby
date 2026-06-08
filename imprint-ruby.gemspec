@@ -26,7 +26,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_dependency "concurrent-ruby", "~> 1.0"
-  spec.add_dependency "ostruct"  # Required for Ruby 3.5+
+  spec.add_dependency "ostruct", ">= 0.3"  # Becomes a bundled (non-default) gem in Ruby 3.5+
 
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rspec", "~> 3.0"
