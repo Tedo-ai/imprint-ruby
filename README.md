@@ -744,3 +744,14 @@ For SDK version compatibility with the Imprint platform, required dependencies, 
 - [Documentation](https://docs.imprint.cloud)
 - [Go Agent](https://github.com/Tedo-ai/imprint-go)
 - [Browser Agent](https://github.com/Tedo-ai/imprint/tree/main/agents/browser)
+
+## Async Export Rule
+
+Imprint SDKs **must not perform HTTP on the caller (request) thread**. Recording
+a span/log/metric is a non-blocking enqueue; reaching `batch_size` signals the
+background worker, which owns all export I/O. Buffer overflow drops (backpressure).
+Synchronous flush is only allowed at shutdown.
+
+**This SDK:** ✅ compliant — worker-owned flush; enqueue signals the worker (no inline POST on the request thread).
+
+Full rule + runtime-specific guidance: `imprint-internal/docs/sdk-async-export-rule.md`.

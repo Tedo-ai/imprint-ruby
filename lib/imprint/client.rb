@@ -12,6 +12,16 @@ module Imprint
       @stopped = false
       @worker_thread = nil
 
+      # Wake channel for the export worker. Reaching batch_size SIGNALS the
+      # worker instead of flushing on the caller thread — exports must never
+      # block the request thread (see the ASYNC EXPORT RULE in the README and
+      # the imprint SDK docs). @flush_requested makes the signal lossless: if it
+      # is set before the worker starts waiting, the worker flushes immediately
+      # rather than sleeping a full flush_interval.
+      @flush_mutex = Mutex.new
+      @flush_cv = ConditionVariable.new
+      @flush_requested = false
+
       if @config.debug
         puts "[Imprint] Initializing client..."
         puts "[Imprint]   API Key: #{@config.api_key&.slice(0, 20)}..."
@@ -164,32 +174,39 @@ module Imprint
       queue_log(log_entry)
     end
 
-    # Queue a log entry for batch sending
+    # Queue a log entry for batch sending. Non-blocking: never performs HTTP on
+    # the caller thread. Reaching batch_size wakes the worker; it does the I/O.
     def queue_log(log_entry)
       return unless enabled?
 
       if @log_buffer.size < @config.buffer_size
         @log_buffer << log_entry
-        flush_logs_sync if @log_buffer.size >= @config.batch_size
+        wake_worker if @log_buffer.size >= @config.batch_size
       end
-      # Drop log if buffer is full (avoid memory issues)
+      # Drop log if buffer is full (backpressure, avoid memory issues)
     end
 
-    # Queue a span for batch sending
+    # Queue a span for batch sending. Non-blocking: never performs HTTP on the
+    # caller (request) thread. Reaching batch_size wakes the worker, which owns
+    # all exports — so a high-span request is never penalised with inline POSTs.
     def queue_span(span)
       return unless enabled?
 
       if @buffer.size < @config.buffer_size
         @buffer << span
-        flush_sync if @buffer.size >= @config.batch_size
+        wake_worker if @buffer.size >= @config.batch_size
       end
-      # Drop span if buffer is full (avoid memory issues)
+      # Drop span if buffer is full (backpressure, avoid memory issues)
     end
 
-    # Shutdown the client and flush remaining spans and logs
+    # Shutdown the client and flush remaining spans and logs. The final flush
+    # runs synchronously here on purpose — this is process teardown, not a
+    # request thread.
     def shutdown(timeout: 5)
       @stopped = true
-      @worker_thread&.kill
+      wake_worker
+      @worker_thread&.join(timeout)
+      @worker_thread&.kill if @worker_thread&.alive?
       flush_sync
       flush_logs_sync
     end
@@ -205,16 +222,34 @@ module Imprint
       Context.with_span(noop) { yield noop }
     end
 
+    # Wake the export worker (called when a buffer crosses batch_size). Cheap and
+    # non-blocking — sets a flag + signals; the worker does the HTTP.
+    def wake_worker
+      @flush_mutex.synchronize do
+        @flush_requested = true
+        @flush_cv.signal
+      end
+    end
+
     def start_worker
       @worker_thread = Thread.new do
-        loop do
-          sleep @config.flush_interval
-          unless @stopped
+        until @stopped
+          begin
+            # Wait for a wake signal OR up to flush_interval, whichever comes
+            # first. The @flush_requested flag prevents a lost wake-up: if a
+            # producer signalled before we got here, skip the wait and flush now.
+            @flush_mutex.synchronize do
+              @flush_cv.wait(@flush_mutex, @config.flush_interval) unless @flush_requested
+              @flush_requested = false
+            end
+            break if @stopped
+
             flush_sync
             flush_logs_sync
+          rescue => e
+            debug_log("Worker error: #{e.class} - #{e.message}")
+            # Never let the worker die on a transient error.
           end
-        rescue => e
-          # Log error but don't crash the worker
         end
       end
     end
