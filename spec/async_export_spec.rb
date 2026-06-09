@@ -56,12 +56,40 @@ RSpec.describe Imprint::Client do
     expect(elapsed).to be < 0.2
   end
 
-  it "drops on overflow instead of growing unbounded (backpressure)" do
-    allow(client).to receive(:send_batch) # swallow
+  it "drops on overflow instead of growing unbounded, and counts the drops" do
+    # Keep the worker from draining so the queue actually fills.
+    allow(client).to receive(:flush_sync)
+    allow(client).to receive(:flush_logs_sync)
     config.buffer_size = 10
     (config.buffer_size + 50).times { client.queue_span(make_span) }
-    # No exception, no unbounded growth: the buffer never exceeds buffer_size.
-    expect(client.instance_variable_get(:@buffer).size).to be <= config.buffer_size
+    expect(client.instance_variable_get(:@span_queue).size).to be <= config.buffer_size
+    expect(client.dropped_spans_count).to be >= 50
+  end
+
+  it "restarts the worker after a fork so forked (Puma) workers still export" do
+    client.queue_span(make_span) # worker running in this process
+    original = client.instance_variable_get(:@worker_thread)
+
+    # Simulate being inside a fork: a different pid than the worker was started under.
+    client.instance_variable_set(:@worker_pid, -1)
+    exported = Queue.new
+    allow(client).to receive(:send_batch) { exported << Thread.current }
+
+    config.batch_size.times { client.queue_span(make_span) }
+    Timeout.timeout(5) { exported.pop } # export resumes → worker was re-started
+
+    expect(client.instance_variable_get(:@worker_thread)).not_to equal(original)
+    expect(client.instance_variable_get(:@worker_pid)).to eq(Process.pid)
+  end
+
+  it "chunks an oversized drain into batch_size-sized POSTs" do
+    config.batch_size = 5
+    q = client.instance_variable_get(:@span_queue)
+    12.times { q << make_span } # pushed directly: no wake, worker stays asleep
+    sizes = []
+    allow(client).to receive(:send_batch) { |spans| sizes << spans.size }
+    client.send(:flush_sync)
+    expect(sizes).to eq([5, 5, 2])
   end
 
   def measure

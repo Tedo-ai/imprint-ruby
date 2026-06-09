@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    imprint-ruby (0.1.1)
+    imprint-ruby (0.1.2)
       concurrent-ruby (~> 1.0)
       ostruct (>= 0.3)
 

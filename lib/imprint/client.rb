@@ -6,11 +6,17 @@ module Imprint
   class Client
     def initialize(configuration)
       @config = configuration
-      @buffer = Concurrent::Array.new
-      @log_buffer = Concurrent::Array.new
-      @mutex = Mutex.new
+      # Lock-free queues: each push/pop is atomic, so draining never races with a
+      # concurrent enqueue (no lost-span window) and the structure is fork-safe.
+      @span_queue = Thread::Queue.new
+      @log_queue = Thread::Queue.new
       @stopped = false
       @worker_thread = nil
+      @worker_pid = nil
+      @lifecycle_mutex = Mutex.new # guards worker (re)start, including across fork
+      @dropped_spans = Concurrent::AtomicFixnum.new(0)
+      @dropped_logs = Concurrent::AtomicFixnum.new(0)
+      @last_drop_log = 0
 
       # Wake channel for the export worker. Reaching batch_size SIGNALS the
       # worker instead of flushing on the caller thread — exports must never
@@ -179,11 +185,13 @@ module Imprint
     def queue_log(log_entry)
       return unless enabled?
 
-      if @log_buffer.size < @config.buffer_size
-        @log_buffer << log_entry
-        wake_worker if @log_buffer.size >= @config.batch_size
+      ensure_worker_for_process!
+      if @log_queue.size >= @config.buffer_size
+        @dropped_logs.increment # backpressure: drop, don't grow unbounded
+        return
       end
-      # Drop log if buffer is full (backpressure, avoid memory issues)
+      @log_queue << log_entry
+      maybe_wake(@log_queue.size)
     end
 
     # Queue a span for batch sending. Non-blocking: never performs HTTP on the
@@ -192,11 +200,13 @@ module Imprint
     def queue_span(span)
       return unless enabled?
 
-      if @buffer.size < @config.buffer_size
-        @buffer << span
-        wake_worker if @buffer.size >= @config.batch_size
+      ensure_worker_for_process!
+      if @span_queue.size >= @config.buffer_size
+        @dropped_spans.increment # backpressure: drop, don't grow unbounded
+        return
       end
-      # Drop span if buffer is full (backpressure, avoid memory issues)
+      @span_queue << span
+      maybe_wake(@span_queue.size)
     end
 
     # Shutdown the client and flush remaining spans and logs. The final flush
@@ -215,6 +225,16 @@ module Imprint
       @config.enabled && @config.valid? && !@stopped
     end
 
+    # Counts of items dropped because the buffer was full (backpressure). Surface
+    # these as an ops gauge so "ingest can't keep up" is visible, not silent loss.
+    def dropped_spans_count
+      @dropped_spans.value
+    end
+
+    def dropped_logs_count
+      @dropped_logs.value
+    end
+
     private
 
     def yield_noop_span
@@ -222,16 +242,53 @@ module Imprint
       Context.with_span(noop) { yield noop }
     end
 
-    # Wake the export worker (called when a buffer crosses batch_size). Cheap and
-    # non-blocking — sets a flag + signals; the worker does the HTTP.
+    # Fork-safety. A Thread does not survive fork() — only the forking thread is
+    # copied — so on a preloading server (Puma preload_app! + workers) the client
+    # is built in the master and every forked worker would have a DEAD
+    # @worker_thread and never export (silent telemetry loss). Lazily (re)start
+    # the worker the first time we enqueue in a new process. Cheap fast-path when
+    # already healthy in this process.
+    def ensure_worker_for_process!
+      return unless @config.enabled && @config.valid?
+      return if @worker_pid == Process.pid && @worker_thread&.alive?
+
+      @lifecycle_mutex.synchronize do
+        return if @worker_pid == Process.pid && @worker_thread&.alive?
+
+        if @worker_pid && @worker_pid != Process.pid
+          # We are in a fork. Inherited queues hold the PARENT's unsent items (the
+          # parent sends its own copy) and the inherited wake state is stale —
+          # reset to clean per-process state so the child never double-sends.
+          @span_queue = Thread::Queue.new
+          @log_queue = Thread::Queue.new
+          @flush_mutex = Mutex.new
+          @flush_cv = ConditionVariable.new
+          @flush_requested = false
+        end
+        start_worker
+      end
+    end
+
+    # Wake the export worker. Cheap, non-blocking. Fast-path: skip the lock if a
+    # flush is already pending (benign race; the flush_interval wait backstops).
     def wake_worker
+      return if @flush_requested
+
       @flush_mutex.synchronize do
         @flush_requested = true
         @flush_cv.signal
       end
     end
 
+    # Wake at most once per batch_size worth of items rather than on every
+    # enqueue past the threshold — bounds wake latency to one batch without
+    # per-span @flush_mutex contention on high-span (700+) requests.
+    def maybe_wake(size)
+      wake_worker if size.positive? && (size % @config.batch_size).zero?
+    end
+
     def start_worker
+      @worker_pid = Process.pid
       @worker_thread = Thread.new do
         until @stopped
           begin
@@ -246,6 +303,7 @@ module Imprint
 
             flush_sync
             flush_logs_sync
+            log_drops
           rescue => e
             debug_log("Worker error: #{e.class} - #{e.message}")
             # Never let the worker die on a transient error.
@@ -254,28 +312,42 @@ module Imprint
       end
     end
 
-    def flush_sync
-      spans_to_send = []
-      @mutex.synchronize do
-        return if @buffer.empty?
-
-        spans_to_send = @buffer.to_a
-        @buffer.clear
+    # Drain a queue without blocking: pop until empty. A push that arrives after
+    # we stop simply rides the next flush — no lost-span race (each pop is atomic,
+    # unlike the old to_a + clear pair).
+    def drain_queue(queue)
+      items = []
+      loop do
+        items << queue.pop(true)
+      rescue ThreadError
+        break
       end
+      items
+    end
 
-      send_batch(spans_to_send) if spans_to_send.any?
+    def flush_sync
+      spans = drain_queue(@span_queue)
+      return if spans.empty?
+
+      # Chunk the drain so a backlog never becomes one oversized POST that exceeds
+      # the ingest payload limit.
+      spans.each_slice(@config.batch_size) { |chunk| send_batch(chunk) }
     end
 
     def flush_logs_sync
-      logs_to_send = []
-      @mutex.synchronize do
-        return if @log_buffer.empty?
+      logs = drain_queue(@log_queue)
+      return if logs.empty?
 
-        logs_to_send = @log_buffer.to_a
-        @log_buffer.clear
-      end
+      logs.each_slice(@config.batch_size) { |chunk| send_logs_batch(chunk) }
+    end
 
-      send_logs_batch(logs_to_send) if logs_to_send.any?
+    # Surface overflow drops in debug mode (only when the count changes).
+    def log_drops
+      total = @dropped_spans.value + @dropped_logs.value
+      return if total == @last_drop_log
+
+      @last_drop_log = total
+      debug_log("dropped on overflow: spans=#{@dropped_spans.value} logs=#{@dropped_logs.value}")
     end
 
     def send_batch(spans)
