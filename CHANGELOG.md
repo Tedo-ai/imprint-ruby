@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-09
+
+Follow-up to v0.1.1's async-export fix, addressing review feedback from a
+production user (Bidvise) running a Puma preload cluster.
+
+### Fixed
+- **Fork safety (critical).** The export worker thread is created at client init
+  and does not survive `fork()`. On a preloading server (Puma `preload_app!` +
+  workers) the client is built in the master, so every forked worker had a dead
+  worker thread and exported nothing — silent telemetry loss. (In v0.1.0 the
+  inline `flush_sync` accidentally masked this.) The worker is now **lazily
+  (re)started per process** on first enqueue (`ensure_worker_for_process!`),
+  resetting inherited queues/wake-state in the child so it never double-sends.
+- **Lost-span race on drain.** Replaced the `Concurrent::Array` `to_a` + `clear`
+  pair (a concurrent `<<` between the two was wiped) with `Thread::Queue` drained
+  by non-blocking pop — each item leaves atomically; a late push rides the next
+  flush.
+
+### Changed
+- **Wake throttling.** Reaching `batch_size` no longer signals the worker on
+  *every* subsequent enqueue (≈700 `@flush_mutex` acquisitions on an 800-span
+  request); it now signals at most once per `batch_size` worth of items, plus a
+  lock-free fast-path that skips the mutex when a flush is already pending.
+- **Chunked drain.** A backlog is now POSTed in `batch_size` chunks instead of
+  one oversized body that could exceed the ingest payload limit.
+
+### Added
+- Overflow drops are counted (`dropped_spans_count` / `dropped_logs_count`) and
+  surfaced in debug logs, so backpressure is visible instead of silent.
+- Regression specs: export survives a simulated fork (worker restarts), drain
+  chunks oversized backlogs, and overflow increments the drop counters.
+
+Thanks to the Bidvise dev for the detailed PR #2 review and prod trace data.
+
 ## [0.1.1] - 2026-06-09
 
 ### Fixed
