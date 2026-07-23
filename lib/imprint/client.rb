@@ -180,6 +180,63 @@ module Imprint
       queue_log(log_entry)
     end
 
+    # Record a deployment marker. Unlike spans/logs/metrics this is a
+    # SYNCHRONOUS single POST — deployments are rare (once per release), so
+    # there is no batching and no background worker involvement. Project and
+    # environment are derived server-side from the API key and must NOT be sent.
+    #
+    # Errors are surfaced, not swallowed: a non-2xx response raises
+    # Imprint::Error and network failures propagate to the caller. A deploy
+    # marker is an explicit, infrequent call — silent failure would hide a
+    # broken release annotation.
+    #
+    # @param revision [String] Git SHA or version being deployed (required)
+    # @param deployed_by [String] User or CI system performing the deploy (required)
+    # @param service [String, nil] Optional service name override
+    # @param branch [String, nil] Optional branch name
+    # @param commit_ref [String, nil] Optional commit ref
+    # @param changelog_url [String, nil] Optional changelog URL
+    # @return [Hash] The parsed JSON response body (empty hash if none)
+    def record_deployment(revision:, deployed_by:, service: nil, branch: nil,
+                          commit_ref: nil, changelog_url: nil)
+      body = {
+        "revision" => revision,
+        "deployed_by" => deployed_by
+      }
+      body["service"] = service if service
+      body["branch"] = branch if branch
+      body["commit_ref"] = commit_ref if commit_ref
+      body["changelog_url"] = changelog_url if changelog_url
+
+      uri = URI(@config.deployments_url)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = uri.scheme == "https"
+      if http.use_ssl?
+        http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+        # Disable CRL checking which can fail with Let's Encrypt certs
+        http.verify_callback = ->(_preverify_ok, store_context) {
+          store_context.error == 0 || store_context.error == 3
+        }
+      end
+      http.open_timeout = 5
+      http.read_timeout = 5
+
+      request = Net::HTTP::Post.new(uri.path)
+      request["Content-Type"] = "application/json"
+      request["Authorization"] = "Bearer #{@config.api_key}"
+      request.body = body.to_json
+
+      debug_log("Sending deployment marker (#{revision}) to #{@config.deployments_url}")
+      response = http.request(request)
+      debug_log("Response: #{response.code} #{response.message}")
+
+      unless response.is_a?(Net::HTTPSuccess)
+        raise Imprint::Error, "deployment marker failed: #{response.code} #{response.message} #{response.body}"
+      end
+
+      response.body && !response.body.empty? ? JSON.parse(response.body) : {}
+    end
+
     # Queue a log entry for batch sending. Non-blocking: never performs HTTP on
     # the caller thread. Reaching batch_size wakes the worker; it does the I/O.
     def queue_log(log_entry)

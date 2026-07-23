@@ -30,6 +30,11 @@ module Imprint
       @ingest_url.sub("/v1/spans", "/v1/metrics")
     end
 
+    # Returns the deployments ingest URL derived from ingest_url
+    def deployments_url
+      @ingest_url.sub("/v1/spans", "/v1/deployments")
+    end
+
     # Returns the namespace to use for background jobs
     def effective_job_namespace
       @job_namespace || @service_name

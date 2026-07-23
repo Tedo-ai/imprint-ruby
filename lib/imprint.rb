@@ -48,6 +48,44 @@ module Imprint
       client.record_event(name, attributes: attributes)
     end
 
+    # Record a deployment marker (release annotation) on the Imprint timeline.
+    #
+    # Synchronous single POST — deployments are rare, so this is not batched.
+    # Defaults auto-detect from the environment so CI can call it as a zero-arg
+    # one-liner (customers already set APP_REVISION). Project and environment
+    # are derived server-side from the API key and are never sent.
+    #
+    # @param revision [String] Git SHA or version (required; auto-detected)
+    # @param deployed_by [String] User or CI actor (required; auto-detected)
+    # @param service [String, nil] Optional service name override
+    # @param branch [String, nil] Optional branch name
+    # @param commit_ref [String, nil] Optional commit ref
+    # @param changelog_url [String, nil] Optional changelog URL
+    #
+    # Usage (typically in a CI deploy step):
+    #   Imprint.deployment_marker
+    #   Imprint.deployment_marker(changelog_url: "https://github.com/org/repo/releases/tag/v1.2.3")
+    #
+    def deployment_marker(revision: default_revision, deployed_by: default_actor,
+                          service: configuration.service_name, branch: ENV["GITHUB_REF_NAME"],
+                          commit_ref: ENV["GITHUB_SHA"], changelog_url: nil)
+      if revision.nil? || revision.to_s.empty?
+        raise ArgumentError, "deployment_marker requires a revision (set IMPRINT_REVISION or APP_REVISION, or run inside a git repo)"
+      end
+      if deployed_by.nil? || deployed_by.to_s.empty?
+        raise ArgumentError, "deployment_marker requires deployed_by (set CI_ACTOR, GITHUB_ACTOR, or USER)"
+      end
+
+      client.record_deployment(
+        revision: revision,
+        deployed_by: deployed_by,
+        service: service,
+        branch: branch,
+        commit_ref: commit_ref,
+        changelog_url: changelog_url
+      )
+    end
+
     # Convenience method to record a gauge metric value
     # @param name [String] The metric name (e.g., "process.runtime.ruby.mem.rss")
     # @param value [Numeric] The metric value
@@ -247,6 +285,25 @@ module Imprint
       # If we have a root span tracking mechanism, use it
       # For now, return the current span (which is typically the request span)
       span
+    end
+
+    # Auto-detect the revision being deployed. Prefers explicit env vars
+    # (customers already set APP_REVISION), falling back to the git HEAD. The
+    # backtick shell-out is guarded: outside a git repo it returns nil rather
+    # than raising.
+    def default_revision
+      env = ENV["IMPRINT_REVISION"] || ENV["APP_REVISION"]
+      return env unless env.nil? || env.empty?
+
+      sha = `git rev-parse HEAD 2>/dev/null`.chomp
+      sha.empty? ? nil : sha
+    rescue StandardError
+      nil
+    end
+
+    # Auto-detect the actor performing the deploy from common CI env vars.
+    def default_actor
+      ENV["CI_ACTOR"] || ENV["GITHUB_ACTOR"] || ENV["USER"]
     end
 
     def stringify_tags(tags)

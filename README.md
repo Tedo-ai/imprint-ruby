@@ -368,6 +368,45 @@ render json: {
 }
 ```
 
+## Deployment Markers
+
+Annotate the Imprint timeline with a marker every time you ship a release, so
+you can correlate error/latency changes with deploys. This is a synchronous,
+one-shot call (deploys are rare — it is not batched).
+
+Defaults auto-detect from the environment, so in CI it is a zero-arg one-liner:
+
+```ruby
+Imprint.deployment_marker
+```
+
+Auto-detection:
+
+| Field | Source (in order) |
+|-------|-------------------|
+| `revision` | `IMPRINT_REVISION`, `APP_REVISION`, then `git rev-parse HEAD` |
+| `deployed_by` | `CI_ACTOR`, `GITHUB_ACTOR`, `USER` |
+| `branch` | `GITHUB_REF_NAME` |
+| `commit_ref` | `GITHUB_SHA` |
+
+`revision` and `deployed_by` are required; if neither the arguments nor the
+environment provide them an `ArgumentError` is raised. Project and environment
+are derived server-side from your API key. You can override any field or add an
+optional `changelog_url`:
+
+```ruby
+Imprint.deployment_marker(
+  deployed_by: "release-bot",
+  changelog_url: "https://github.com/org/repo/releases/tag/v1.2.3"
+)
+```
+
+A Rake task is included for CI deploy steps:
+
+```bash
+bundle exec rake imprint:deploy_marker
+```
+
 ## Background Jobs
 
 ### ActiveJob
@@ -626,6 +665,9 @@ Imprint.set_tag(:key, value)
 Imprint.set_action(name)
 Imprint.set_namespace(namespace)
 Imprint.send_error(exception, **context)
+
+# Deployment Markers
+Imprint.deployment_marker(revision: ..., deployed_by: ..., changelog_url: ...)
 
 # Context Access
 Imprint.current_trace_id
